@@ -174,31 +174,34 @@ class Fastconfirm:
 
             return vote_send
 
-        delta = 0.2
+        delta = 0.08
         start = time.time()
         t, my_pi, my_h = memselection(self.round, 2, self.sPK2s[self.id], self.sSK2)
+        bp_count = 0
         if t == 1:
             # wait for bp finish
             # print(start)
             (b, r, lg) = self.state
-            minh = 0
+            maxh = 0
             leader = 0
             leader_msg = None
             while time.time() - start < delta:
-                try:
-                    gevent.sleep(0)
-                    sender, (g, h, pi, B, hB, height, sig) = bp_recvs.get_nowait()
-                except:
-                    continue
+                gevent.sleep(0)
+                # print(bp_recvs.qsize())
+            while bp_recvs.qsize() > 0:
+                gevent.sleep(0)
+                sender, (g, h, pi, B, hB, height, sig) = bp_recvs.get()
+                # print(sender, (g, h, pi, B, hB, height, sig))
+
                 if lg == 2 or (lg == 1 and self.lastcommit == 1):
                     if g == 0:
                         continue
-                if minh < int.from_bytes(h, 'big'):
-                    minh = int.from_bytes(h, 'big')
+                if maxh < int.from_bytes(h, 'big'):
+                    maxh = int.from_bytes(h, 'big')
                     leader = sender
-                    # print(pid, "change:", leader)
+                    # print(self.id, "change:", leader)
                     leader_msg = (g, h, pi, B, hB, height, sig)
-            print(self.id, "get the leader:", leader, "chosen block is:", leader_msg)
+            # print(self.id, "get the leader:", leader, "chosen block is:", leader_msg)
             vote(self.id, self.sid, self.N, self.sPK2s, self.sSK2, self.rpk, self.rsk, self.rmt,
                  self.round, t, my_pi, my_h, leader_msg, make_vote_send(self.round))
         else:
@@ -227,13 +230,10 @@ class Fastconfirm:
             start = time.time()
             pc_hB = 0
             while time.time() - start < delta:
-                try:
-                    gevent.sleep(0)
-                    sender, (g, h, pi, hB, height, sig) = vote_recvs.get_nowait()
-                    # print(sender, (g, h, pi, hB, height, sig))
-                except:
-                    continue
-
+                gevent.sleep(0)
+            while vote_recvs.qsize() > 0:
+                gevent.sleep(0)
+                sender, (g, h, pi, hB, height, sig) = vote_recvs.get()
                 if vrifymember(self.round, 2, h, pi, self.sPK2s[sender]):
                     (s, b) = sig
                     # assert vrify(s, b, hB, sPK2s[sender], rmt, ((round - 1) * 4) + 1, 1024)
@@ -241,18 +241,20 @@ class Fastconfirm:
                     if voteset[hB].qsize() >= (2 * self.f + 1) * self.T:
                         pc_hB = hB
                         c = 1
+            """
             if c == 1:
                 print("get a valid vote set")
             else:
                 print("not valid vote set")
+            """
             precommit(self.id, self.sid, self.N, self.sPK2s, self.sSK2, self.rpk, self.rsk, self.rmt,
-                      self.round, t, my_pi, my_h, c, voteset[pc_hB], pc_hB,
+                      self.round, t, my_pi, my_h, c, pc_hB,
                       make_pc_send(self.round))
         else:
             while time.time() - start < delta:
                 gevent.sleep(0)
             precommit(self.id, self.sid, self.N, self.sPK2s, self.sSK2, self.rpk, self.rsk, self.rmt,
-                      self.round, t, my_pi, my_h, 0, None, None,
+                      self.round, t, my_pi, my_h, 0, None,
                       make_pc_send(self.round))
 
         def make_commit_send(r):  # this make will automatically deep copy the enclosed send func
@@ -274,23 +276,24 @@ class Fastconfirm:
         c_hB = 0
         c = 0
         while time.time() - start < delta:
-            try:
-                gevent.sleep(0)
-                sender, (g, h, pi, pc_hB, voteset, sig) = pc_recvs.get_nowait()
-            except:
-                continue
+            gevent.sleep(0)
+        while pc_recvs.qsize() > 0:
+            gevent.sleep(0)
+            sender, (g, h, pi, pc_hB, sig) = pc_recvs.get()
+
             if vrifymember(self.round, 3, h, pi, self.sPK2s[sender]):
                 (s, b) = sig
                 # assert vrify(s, b, hB, sPK2s[sender], rmt, ((round - 1) * 4) + 1, 1024)
-                preset[pc_hB].put((sender, h, pi, voteset, sig))
+                preset[pc_hB].put((sender, h, pi, sig))
                 if preset[pc_hB].qsize() >= (2 * self.f + 1) * self.T:
                     c_hB = pc_hB
                     o = 1
+        """
         if o == 1:
             print("get a valid omega set")
         else:
             print("not a valid omega set")
-
+        """
         commit(self.id, self.sid, self.N, self.sPK2s, self.sSK2, self.rpk, self.rsk, self.rmt,
                self.round, o, preset[c_hB], c_hB, make_commit_send(self.round))
 
@@ -313,18 +316,19 @@ class Fastconfirm:
                     if omegaset[c_hB].qsize() >= (2 * self.f + 1) * self.T:
                         g_hB = c_hB
                         pc = 1
+        """
         if pc == 1:
             print("get a valid PC set")
         else:
             print("not a valid PC set")
-
+        """
         if c_hB == g_hB:
             self.state = (g_hB, self.round, 2)
         elif (c_hB != g_hB and pc == 1) or (o == 0 and pc == 1):
             self.state = (g_hB, self.round, 1)
         elif o == 0 and pc == 0:
             self.state = (c_hB, self.round, 0)
-        print(self.state)
+        # print(self.state)
 
         if self.round == 1:
             print(B)
@@ -372,8 +376,10 @@ class Fastconfirm:
 
 
 
-        while self.round <= 10:
+        while self.round <= self.SLOTS_NUM:
             if self.round not in self._per_round_recv:
                 self._per_round_recv[self.round] = Queue()
-
+            st = time.time()
             self.fastconfirm_round()
+            if self.id == 0: print(time.time()-st)
+            time.sleep(0.1)

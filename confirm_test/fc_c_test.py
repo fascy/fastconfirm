@@ -1,7 +1,7 @@
 import random
 import time
 import gevent
-from gevent import monkey
+from gevent import monkey, Greenlet
 from gevent.queue import Queue
 
 from crypto.ecdsa import ecdsa
@@ -12,7 +12,7 @@ from fastconfirm.core.fastconfirm import Fastconfirm
 monkey.patch_all(thread=False)
 
 
-def simple_router(N, maxdelay=0.01, seed=None):
+def simple_router(N, maxdelay=0.000001, seed=None):
     """Builds a set of connected channels, with random delay
 
     :return: (receives, sends)
@@ -24,7 +24,7 @@ def simple_router(N, maxdelay=0.01, seed=None):
 
     def makeSend(i):
         def _send(j, o):
-            delay = rnd.random() * maxdelay
+            delay = 0
             if not i % 3:
                 delay *= 0
             gevent.spawn_later(delay, queues[j].put_nowait, (i, o))
@@ -45,7 +45,7 @@ def simple_router(N, maxdelay=0.01, seed=None):
 
 
 ### Test asynchronous common subset
-def _test_dumbo(N=8, f=2, seed=None):
+def _test_dumbo(N=16, f=5, seed=None):
     sid = 'sidA'
     pks, sks = ecdsa.pki(N)
 
@@ -56,6 +56,7 @@ def _test_dumbo(N=8, f=2, seed=None):
 
     fcs = [None] * N
     threads = [None] * N
+
 
     # This is an experiment parameter to specify the maximum round number
     K = 10
@@ -73,6 +74,7 @@ def _test_dumbo(N=8, f=2, seed=None):
 
     for i in range(N):
         threads[i] = gevent.spawn(fcs[i].run_fast)
+    gevent.joinall(threads)
 
     print('start the test...')
     time_start = time.time()

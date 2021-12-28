@@ -31,11 +31,11 @@ def commit(pid, sid, N, PK2s, SK2, rpk, rsk, rmt, round, o, omega, c_hB, send, l
     t, my_pi, my_h = memselection(round, 4, PK2s[pid], SK2)
     # print("--", pid, h, pi)
     if t == 1:
-        print(pid, "is select in pre-commit!")
+        # print(pid, "is select in pre-commit!")
         msg = (o, my_h, my_pi, c_hB, omega, sig, rpk[position], rmt[1])
         commit_broadcast(msg)
         # print(pid, "sends", msg)
         return 1
     else:
-        print(pid, "is not selected as a committee member")
+        # print(pid, "is not selected as a committee member")
         return 0

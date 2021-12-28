@@ -21,7 +21,7 @@ def blockproposal(pid, sid, N, PK2s, SK2, rpk, rsk, rmt, round, state, height, l
 
     t, pi, h = memselection(round, 1, PK2s[pid], SK2)
     if t == 1:
-        print(pid, "is select!")
+        # print(pid, "is select!")
         (b, r, s) = state
         txs = input()
         if s == 2:
